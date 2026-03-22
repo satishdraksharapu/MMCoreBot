@@ -13,11 +13,13 @@ public class TwilioWebhookController : ControllerBase
 {
     private readonly GeminiService _gemini;
     private readonly ILogger<TwilioWebhookController> _logger;
+    private readonly HttpClient _http;
 
-    public TwilioWebhookController(GeminiService gemini, ILogger<TwilioWebhookController> logger)
+    public TwilioWebhookController(GeminiService gemini, ILogger<TwilioWebhookController> logger, HttpClient http)
     {
         _gemini = gemini;
         _logger = logger;
+        _http = http;
     }
 
     // POST /api/webhook/whatsapp
@@ -35,10 +37,27 @@ public class TwilioWebhookController : ControllerBase
 
             _logger.LogInformation("[IN]  {Phone}: {Body}", phone, body);
 
-            if (string.IsNullOrWhiteSpace(body))
-                return TwiML("I didn't catch that — please send a message! 😊");
+            // Extract image if available
+            int.TryParse(form["NumMedia"].ToString(), out int numMedia);
+            byte[]? imageBytes = null;
+            string? mimeType = null;
 
-            var reply = await _gemini.ProcessMessage(phone, body);
+            if (numMedia > 0)
+            {
+                var mediaUrl = form["MediaUrl0"].ToString();
+                mimeType = form["MediaContentType0"].ToString();
+
+                if (!string.IsNullOrEmpty(mediaUrl) && mimeType.StartsWith("image/"))
+                {
+                    _logger.LogInformation("Downloading image from {MediaUrl}", mediaUrl);
+                    imageBytes = await _http.GetByteArrayAsync(mediaUrl);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(body) && imageBytes == null)
+                return TwiML("I didn't catch that — please send a message or an image! 😊");
+
+            var reply = await _gemini.ProcessMessage(phone, body, imageBytes, mimeType);
 
             _logger.LogInformation("[OUT] {Phone}: {Reply}", phone, reply);
             return TwiML(reply);

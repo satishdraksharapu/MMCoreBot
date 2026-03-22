@@ -1,7 +1,7 @@
+using BudgetAgent.Controllers;
 using BudgetAgent.Data;
 using BudgetAgent.Services;
 using Microsoft.EntityFrameworkCore;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Services ──────────────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(connectionString));
 
 builder.Services.AddHttpClient<GeminiService>();
+builder.Services.AddHttpClient<TwilioWebhookController>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<GeminiService>();
 

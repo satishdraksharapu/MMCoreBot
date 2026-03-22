@@ -37,7 +37,7 @@ public class GeminiService
 
     // ─── Public Entry Point ────────────────────────────────────────────────
 
-    public async Task<string> ProcessMessage(string phone, string userMessage)
+    public async Task<string> ProcessMessage(string phone, string userMessage, byte[]? imageBytes = null, string? mimeType = null)
     {
         // 1. Gather current state from DB
         var (budget, spent, remaining) = await _budget.GetBudgetSummary(phone);
@@ -47,14 +47,18 @@ public class GeminiService
 
         // 2. Build inputs for Gemini
         var systemPrompt = BuildSystemPrompt(budget, spent, remaining, transactions, categoryBreakdown);
-        var messages     = BuildMessages(history, userMessage);
+        var messages     = BuildMessages(history, userMessage, imageBytes, mimeType);
         var tools        = BuildTools();
 
         // 3. Call Gemini (handles tool-use loop internally)
         var reply = await CallGemini(systemPrompt, messages, tools, phone);
 
         // 4. Persist conversation
-        await _budget.SaveMessage(phone, "user",      userMessage);
+        var storedMessage = string.IsNullOrWhiteSpace(userMessage) 
+            ? "[Image processed]" 
+            : (imageBytes != null ? $"{userMessage}\n[Image processed]" : userMessage);
+
+        await _budget.SaveMessage(phone, "user",      storedMessage);
         await _budget.SaveMessage(phone, "assistant", reply);
 
         return reply;
@@ -116,7 +120,7 @@ public class GeminiService
 
     // ─── Messages Builder ──────────────────────────────────────────────────
 
-    private static List<object> BuildMessages(List<ConversationMessage> history, string newUserMessage)
+    private static List<object> BuildMessages(List<ConversationMessage> history, string newUserMessage, byte[]? imageBytes, string? mimeType)
     {
         var messages = new List<object>();
 
@@ -126,7 +130,27 @@ public class GeminiService
             messages.Add(new { role = role, parts = new[] { new { text = m.Content } } });
         }
 
-        messages.Add(new { role = "user", parts = new[] { new { text = newUserMessage } } });
+        var newParts = new List<object>();
+        
+        if (imageBytes != null && mimeType != null)
+        {
+            newParts.Add(new
+            {
+                inlineData = new
+                {
+                    mimeType = mimeType,
+                    data = Convert.ToBase64String(imageBytes)
+                }
+            });
+        }
+
+        var textContent = string.IsNullOrWhiteSpace(newUserMessage) 
+            ? "Please look at this image and extract any transaction details if applicable." 
+            : newUserMessage;
+
+        newParts.Add(new { text = textContent });
+
+        messages.Add(new { role = "user", parts = newParts.ToArray() });
         return messages;
     }
 
