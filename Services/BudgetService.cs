@@ -1,6 +1,5 @@
-using BudgetAgent.Data;
 using BudgetAgent.Models;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 
 namespace BudgetAgent.Services;
 
@@ -9,45 +8,60 @@ namespace BudgetAgent.Services;
 /// </summary>
 public class BudgetService
 {
-    private readonly AppDbContext _db;
+    private readonly IMongoCollection<UserBudget> _budgets;
+    private readonly IMongoCollection<Transaction> _transactions;
+    private readonly IMongoCollection<ConversationMessage> _messages;
 
-    public BudgetService(AppDbContext db) => _db = db;
+    public BudgetService(IMongoDatabase database)
+    {
+        _budgets = database.GetCollection<UserBudget>("UserBudgets");
+        _transactions = database.GetCollection<Transaction>("Transactions");
+        _messages = database.GetCollection<ConversationMessage>("ConversationMessages");
+
+        // Ensure one budget entry per user per month
+        var indexKeysDefinition = Builders<UserBudget>.IndexKeys
+            .Ascending(u => u.PhoneNumber)
+            .Ascending(u => u.Month)
+            .Ascending(u => u.Year);
+        var indexOptions = new CreateIndexOptions { Unique = true };
+        var indexModel = new CreateIndexModel<UserBudget>(indexKeysDefinition, indexOptions);
+        _budgets.Indexes.CreateOne(indexModel);
+    }
 
     // ─── Budget ────────────────────────────────────────────────────────────
 
     public async Task<UserBudget?> GetCurrentBudget(string phone)
     {
         var now = DateTime.UtcNow;
-        return await _db.UserBudgets
-            .FirstOrDefaultAsync(b => b.PhoneNumber == phone
-                                   && b.Month == now.Month
-                                   && b.Year == now.Year);
+        var filter = Builders<UserBudget>.Filter.And(
+            Builders<UserBudget>.Filter.Eq(b => b.PhoneNumber, phone),
+            Builders<UserBudget>.Filter.Eq(b => b.Month, now.Month),
+            Builders<UserBudget>.Filter.Eq(b => b.Year, now.Year)
+        );
+        return await _budgets.Find(filter).FirstOrDefaultAsync();
     }
 
     public async Task<UserBudget> SetBudget(string phone, decimal amount)
     {
         var now = DateTime.UtcNow;
-        var budget = await GetCurrentBudget(phone);
+        var filter = Builders<UserBudget>.Filter.And(
+            Builders<UserBudget>.Filter.Eq(b => b.PhoneNumber, phone),
+            Builders<UserBudget>.Filter.Eq(b => b.Month, now.Month),
+            Builders<UserBudget>.Filter.Eq(b => b.Year, now.Year)
+        );
 
-        if (budget == null)
-        {
-            budget = new UserBudget
-            {
-                PhoneNumber = phone,
-                MonthlyBudget = amount,
-                Month = now.Month,
-                Year = now.Year
-            };
-            _db.UserBudgets.Add(budget);
-        }
-        else
-        {
-            budget.MonthlyBudget = amount;
-            budget.UpdatedAt = DateTime.UtcNow;
-        }
+        var update = Builders<UserBudget>.Update
+            .Set(b => b.MonthlyBudget, amount)
+            .Set(b => b.UpdatedAt, DateTime.UtcNow)
+            .SetOnInsert(b => b.CreatedAt, DateTime.UtcNow);
 
-        await _db.SaveChangesAsync();
-        return budget;
+        var options = new FindOneAndUpdateOptions<UserBudget>
+        {
+            IsUpsert = true,
+            ReturnDocument = ReturnDocument.After
+        };
+
+        return await _budgets.FindOneAndUpdateAsync(filter, update, options);
     }
 
     // ─── Transactions ──────────────────────────────────────────────────────
@@ -66,18 +80,19 @@ public class BudgetService
             Month = now.Month,
             Year = now.Year
         };
-        _db.Transactions.Add(tx);
-        await _db.SaveChangesAsync();
+        await _transactions.InsertOneAsync(tx);
         return tx;
     }
 
     public async Task<List<Transaction>> GetMonthlyTransactions(string phone)
     {
         var now = DateTime.UtcNow;
-        return await _db.Transactions
-            .Where(t => t.PhoneNumber == phone && t.Month == now.Month && t.Year == now.Year)
-            .OrderByDescending(t => t.CreatedAt)
-            .ToListAsync();
+        var filter = Builders<Transaction>.Filter.And(
+            Builders<Transaction>.Filter.Eq(t => t.PhoneNumber, phone),
+            Builders<Transaction>.Filter.Eq(t => t.Month, now.Month),
+            Builders<Transaction>.Filter.Eq(t => t.Year, now.Year)
+        );
+        return await _transactions.Find(filter).SortByDescending(t => t.CreatedAt).ToListAsync();
     }
 
     /// <summary>Returns (totalBudget, totalSpent, remaining) for the current month.</summary>
@@ -108,22 +123,23 @@ public class BudgetService
     /// <summary>Retrieves the last N messages for a user, oldest first (for Claude's messages array).</summary>
     public async Task<List<ConversationMessage>> GetRecentConversation(string phone, int limit = 10)
     {
-        return await _db.ConversationMessages
-            .Where(m => m.PhoneNumber == phone)
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(limit)
-            .OrderBy(m => m.CreatedAt)   // re-sort ascending for Claude
+        var filter = Builders<ConversationMessage>.Filter.Eq(m => m.PhoneNumber, phone);
+        var messages = await _messages.Find(filter)
+            .SortByDescending(m => m.CreatedAt)
+            .Limit(limit)
             .ToListAsync();
+        
+        messages.Reverse(); // re-sort ascending for Claude/Gemini
+        return messages;
     }
 
     public async Task SaveMessage(string phone, string role, string content)
     {
-        _db.ConversationMessages.Add(new ConversationMessage
+        await _messages.InsertOneAsync(new ConversationMessage
         {
             PhoneNumber = phone,
             Role = role,
             Content = content
         });
-        await _db.SaveChangesAsync();
     }
 }

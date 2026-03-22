@@ -1,20 +1,23 @@
 using BudgetAgent.Controllers;
-using BudgetAgent.Data;
 using BudgetAgent.Services;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Services ──────────────────────────────────────────────────────────────
 
 builder.Services.AddControllers();
 
-// SQLite — path is /data/budget.db so Railway's persistent volume can map to /data
-var connectionString = builder.Configuration["ConnectionStrings__DefaultConnection"]
-                    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-                    ?? "Data Source=/data/budget.db";
+// MongoDB setup
+var connectionString = builder.Configuration["MongoConnectionString"] 
+                    ?? "mongodb://localhost:27017/budgetdb";
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(connectionString));
+var mongoUrl = new MongoUrl(connectionString);
+var mongoClient = new MongoClient(mongoUrl);
+var databaseName = mongoUrl.DatabaseName ?? "budgetdb";
+var database = mongoClient.GetDatabase(databaseName);
+
+builder.Services.AddSingleton<IMongoDatabase>(database);
 
 builder.Services.AddHttpClient<GeminiService>();
 builder.Services.AddHttpClient<TwilioWebhookController>();
@@ -24,13 +27,6 @@ builder.Services.AddScoped<GeminiService>();
 // ─── App ───────────────────────────────────────────────────────────────────
 
 var app = builder.Build();
-
-// Auto-create database tables on startup
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
-}
 
 app.UseRouting();
 app.MapControllers();
