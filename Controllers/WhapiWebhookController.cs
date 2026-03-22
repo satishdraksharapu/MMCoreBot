@@ -22,7 +22,7 @@ public class WhapiWebhookController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Post([FromBody] JObject payload)
+    public async Task<IActionResult> Post()
     {
         // 1. Check if Whapi is the active provider
         var provider = _config["WhatsApp__Provider"] ?? _config["WhatsApp:Provider"] ?? "Twilio";
@@ -33,6 +33,12 @@ public class WhapiWebhookController : ControllerBase
 
         try
         {
+            using var reader = new System.IO.StreamReader(Request.Body);
+            var jsonString = await reader.ReadToEndAsync();
+            if (string.IsNullOrWhiteSpace(jsonString)) return Ok();
+
+            var payload = JObject.Parse(jsonString);
+
             var messages = payload["messages"] as JArray;
             if (messages == null || messages.Count == 0) return Ok();
 
