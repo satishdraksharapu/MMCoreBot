@@ -14,18 +14,27 @@ public class TwilioWebhookController : ControllerBase
     private readonly GeminiService _gemini;
     private readonly ILogger<TwilioWebhookController> _logger;
     private readonly HttpClient _http;
+    private readonly IConfiguration _config;
 
-    public TwilioWebhookController(GeminiService gemini, ILogger<TwilioWebhookController> logger, HttpClient http)
+    public TwilioWebhookController(GeminiService gemini, ILogger<TwilioWebhookController> logger, HttpClient http, IConfiguration config)
     {
         _gemini = gemini;
         _logger = logger;
         _http = http;
+        _config = config;
     }
 
     // POST /api/webhook/whatsapp
     [HttpPost("whatsapp")]
     public async Task<ContentResult> WhatsApp()
     {
+        var provider = _config["WhatsApp__Provider"] ?? _config["WhatsApp:Provider"] ?? "Twilio";
+        if (!provider.Equals("Twilio", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Twilio request ignored because WhatsApp Provider is {Provider}", provider);
+            return TwiML("Twilio integration is disabled.");
+        }
+
         try
         {
             var form = await Request.ReadFormAsync();
