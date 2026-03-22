@@ -21,8 +21,10 @@ builder.Services.AddSingleton<IMongoDatabase>(database);
 
 builder.Services.AddHttpClient<GeminiService>();
 builder.Services.AddHttpClient<TwilioWebhookController>();
+builder.Services.AddHttpClient<WhapiService>();
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<GeminiService>();
+builder.Services.AddScoped<WhapiService>();
 
 // ─── App ───────────────────────────────────────────────────────────────────
 
