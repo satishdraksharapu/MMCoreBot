@@ -31,6 +31,13 @@ var app = builder.Build();
 app.UseRouting();
 app.MapControllers();
 
+// Ensure Mongo indexes on startup
+using (var scope = app.Services.CreateScope())
+{
+    var budget = scope.ServiceProvider.GetRequiredService<BudgetService>();
+    budget.EnsureIndexes();
+}
+
 // Railway injects PORT env var; fall back to 8080
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Run($"http://0.0.0.0:{port}");

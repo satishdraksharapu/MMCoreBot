@@ -17,15 +17,24 @@ public class BudgetService
         _budgets = database.GetCollection<UserBudget>("UserBudgets");
         _transactions = database.GetCollection<Transaction>("Transactions");
         _messages = database.GetCollection<ConversationMessage>("ConversationMessages");
+    }
 
-        // Ensure one budget entry per user per month
-        var indexKeysDefinition = Builders<UserBudget>.IndexKeys
-            .Ascending(u => u.PhoneNumber)
-            .Ascending(u => u.Month)
-            .Ascending(u => u.Year);
-        var indexOptions = new CreateIndexOptions { Unique = true };
-        var indexModel = new CreateIndexModel<UserBudget>(indexKeysDefinition, indexOptions);
-        _budgets.Indexes.CreateOne(indexModel);
+    public void EnsureIndexes()
+    {
+        try 
+        {
+            var indexKeysDefinition = Builders<UserBudget>.IndexKeys
+                .Ascending(u => u.PhoneNumber)
+                .Ascending(u => u.Month)
+                .Ascending(u => u.Year);
+            var indexOptions = new CreateIndexOptions { Unique = true };
+            var indexModel = new CreateIndexModel<UserBudget>(indexKeysDefinition, indexOptions);
+            _budgets.Indexes.CreateOne(indexModel);
+        }
+        catch (Exception) 
+        {
+            // Ignore if it fails due to permissions or existing indexes
+        }
     }
 
     // ─── Budget ────────────────────────────────────────────────────────────
