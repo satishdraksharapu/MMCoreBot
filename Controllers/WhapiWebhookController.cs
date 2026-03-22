@@ -72,10 +72,10 @@ public class WhapiWebhookController : ControllerBase
 
                     if (string.IsNullOrEmpty(imageLink))
                     {
-                        var msgId = message["id"]?.ToString();
-                        if (!string.IsNullOrEmpty(msgId))
+                        var mediaId = message["image"]?["id"]?.ToString();
+                        if (!string.IsNullOrEmpty(mediaId))
                         {
-                            imageLink = $"https://gate.whapi.cloud/messages/{msgId}/media";
+                            imageLink = $"https://gate.whapi.cloud/media/{mediaId}";
                         }
                     }
 
@@ -86,7 +86,7 @@ public class WhapiWebhookController : ControllerBase
 
                     if (imageBytes == null)
                     {
-                        _logger.LogWarning("[IN WHAPI] Failed to download image for message ID {MsgId}. Proceeding with text only if available.", message["id"]);
+                        _logger.LogWarning("[IN WHAPI] Failed to download image from link {ImageLink}. Proceeding with text only if available.", imageLink);
                         if (string.IsNullOrWhiteSpace(body))
                         {
                             body = "[An image was sent but it could not be downloaded or processed by the system.]";
