@@ -21,12 +21,14 @@ builder.Services.AddSingleton<IMongoDatabase>(database);
 
 builder.Services.AddHttpClient<GeminiService>();
 builder.Services.AddHttpClient<OpenAIService>();
+builder.Services.AddHttpClient<ClaudeService>();
 builder.Services.AddHttpClient<TwilioWebhookController>();
 builder.Services.AddHttpClient<WhapiService>();
 
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<GeminiService>();
 builder.Services.AddScoped<OpenAIService>();
+builder.Services.AddScoped<ClaudeService>();
 builder.Services.AddScoped<WhapiService>();
 
 builder.Services.AddScoped<ILlmService>(provider => 
@@ -36,6 +38,8 @@ builder.Services.AddScoped<ILlmService>(provider =>
     
     switch (llmProvider.ToLower())
     {
+        case "claude":
+            return provider.GetRequiredService<ClaudeService>();
         case "openai":
             return provider.GetRequiredService<OpenAIService>();
         case "gemini":
