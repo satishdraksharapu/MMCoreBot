@@ -58,7 +58,7 @@ public class TwilioWebhookController : ControllerBase
 
                 if (!string.IsNullOrEmpty(mediaUrl) && mimeType.StartsWith("image/"))
                 {
-                    _logger.LogInformation("Downloading image from {MediaUrl}", mediaUrl);
+                    _logger.LogInformation("Downloading image from {MediaUrl} ", mediaUrl);
                     imageBytes = await _http.GetByteArrayAsync(mediaUrl);
                 }
             }
