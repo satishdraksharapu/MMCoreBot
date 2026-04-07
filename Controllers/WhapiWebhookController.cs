@@ -8,14 +8,14 @@ namespace BudgetAgent.Controllers;
 [Route("api/webhook/whapi")]
 public class WhapiWebhookController : ControllerBase
 {
-    private readonly GeminiService _gemini;
+    private readonly ILlmService _llm;
     private readonly WhapiService _whapi;
     private readonly IConfiguration _config;
     private readonly ILogger<WhapiWebhookController> _logger;
 
-    public WhapiWebhookController(GeminiService gemini, WhapiService whapi, IConfiguration config, ILogger<WhapiWebhookController> logger)
+    public WhapiWebhookController(ILlmService llm, WhapiService whapi, IConfiguration config, ILogger<WhapiWebhookController> logger)
     {
-        _gemini = gemini;
+        _llm = llm;
         _whapi = whapi;
         _config = config;
         _logger = logger;
@@ -104,8 +104,8 @@ public class WhapiWebhookController : ControllerBase
                 if (string.IsNullOrWhiteSpace(body) && imageBytes == null)
                     continue;
 
-                // 2. Process via Gemini
-                var reply = await _gemini.ProcessMessage(phone, body, imageBytes, mimeType);
+                // 2. Process via LLM
+                var reply = await _llm.ProcessMessage(phone, body, imageBytes, mimeType);
 
                 _logger.LogInformation("[OUT WHAPI] {Phone}: {Reply}", phone, reply);
 

@@ -20,11 +20,29 @@ var database = mongoClient.GetDatabase(databaseName);
 builder.Services.AddSingleton<IMongoDatabase>(database);
 
 builder.Services.AddHttpClient<GeminiService>();
+builder.Services.AddHttpClient<OpenAIService>();
 builder.Services.AddHttpClient<TwilioWebhookController>();
 builder.Services.AddHttpClient<WhapiService>();
+
 builder.Services.AddScoped<BudgetService>();
 builder.Services.AddScoped<GeminiService>();
+builder.Services.AddScoped<OpenAIService>();
 builder.Services.AddScoped<WhapiService>();
+
+builder.Services.AddScoped<ILlmService>(provider => 
+{
+    var config = provider.GetRequiredService<IConfiguration>();
+    var llmProvider = config["LLM:Provider"] ?? config["LLM__Provider"] ?? "Gemini";
+    
+    switch (llmProvider.ToLower())
+    {
+        case "openai":
+            return provider.GetRequiredService<OpenAIService>();
+        case "gemini":
+        default:
+            return provider.GetRequiredService<GeminiService>();
+    }
+});
 
 // ─── App ───────────────────────────────────────────────────────────────────
 

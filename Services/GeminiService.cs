@@ -15,7 +15,7 @@ namespace BudgetAgent.Services;
 ///   3. If Gemini calls a function → execute it → send result back → get final reply
 ///   4. Return the final text to the WhatsApp controller
 /// </summary>
-public class GeminiService
+public class GeminiService : ILlmService
 {
     private readonly HttpClient _http;
     private readonly BudgetService _budget;
@@ -36,8 +36,8 @@ public class GeminiService
                ?? config["Gemini:ApiKey"]
                ?? throw new InvalidOperationException("Gemini API key not configured. Set env var Gemini__ApiKey.");
 
-        _modelToUse = config["Model__ModelToUse"]
-               ?? config["Model:ModelToUse"]
+        _modelToUse = config["Gemini__ModelToUse"]
+               ?? config["Gemini:ModelToUse"]
                ?? throw new InvalidOperationException("Gemini API key not configured. Set env var Gemini__ApiKey.");
 
         ApiUrlBase = "https://generativelanguage.googleapis.com/v1beta/models/" + _modelToUse + ":generateContent";

@@ -11,14 +11,14 @@ namespace BudgetAgent.Controllers;
 [Route("api/webhook")]
 public class TwilioWebhookController : ControllerBase
 {
-    private readonly GeminiService _gemini;
+    private readonly ILlmService _llm;
     private readonly ILogger<TwilioWebhookController> _logger;
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
 
-    public TwilioWebhookController(GeminiService gemini, ILogger<TwilioWebhookController> logger, HttpClient http, IConfiguration config)
+    public TwilioWebhookController(ILlmService llm, ILogger<TwilioWebhookController> logger, HttpClient http, IConfiguration config)
     {
-        _gemini = gemini;
+        _llm = llm;
         _logger = logger;
         _http = http;
         _config = config;
@@ -66,7 +66,7 @@ public class TwilioWebhookController : ControllerBase
             if (string.IsNullOrWhiteSpace(body) && imageBytes == null)
                 return TwiML("I didn't catch that — please send a message or an image! 😊");
 
-            var reply = await _gemini.ProcessMessage(phone, body, imageBytes, mimeType);
+            var reply = await _llm.ProcessMessage(phone, body, imageBytes, mimeType);
 
             _logger.LogInformation("[OUT] {Phone}: {Reply}", phone, reply);
             return TwiML(reply);
