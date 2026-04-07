@@ -21,7 +21,9 @@ public class GeminiService
     private readonly BudgetService _budget;
     private readonly IConfiguration _config;
 
-    private const string ApiUrlBase = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
+    private readonly string _modelToUse;
+
+    private string ApiUrlBase;
     private readonly string _apiKey;
 
     public GeminiService(HttpClient http, BudgetService budget, IConfiguration config)
@@ -33,6 +35,13 @@ public class GeminiService
         _apiKey = config["Gemini__ApiKey"]
                ?? config["Gemini:ApiKey"]
                ?? throw new InvalidOperationException("Gemini API key not configured. Set env var Gemini__ApiKey.");
+
+        _modelToUse = config["Model__ModelToUse"]
+               ?? config["Model:ModelToUse"]
+               ?? throw new InvalidOperationException("Gemini API key not configured. Set env var Gemini__ApiKey.");
+
+        ApiUrlBase = "https://generativelanguage.googleapis.com/v1beta/models/" + _modelToUse + ":generateContent";
+
     }
 
     // ─── Public Entry Point ────────────────────────────────────────────────
